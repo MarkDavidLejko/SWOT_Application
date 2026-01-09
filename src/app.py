@@ -1,7 +1,7 @@
 import json
 from dataclasses import asdict
 from typing import Any, Dict, Optional
-
+import html
 import streamlit as st
 
 from engine.swot_generator import generate_swot
@@ -234,10 +234,10 @@ if st.session_state.error:
 # Render SWOT grid if available
 # ----------------------------
 def render_card(title: str, bullets: list[str], theme_class: str, assumptions: Optional[list[str]] = None) -> None:
-    bullets_html = "".join([f"<li>{st._utils.escape_markdown(b)}</li>" for b in bullets])
+    bullets_html = "".join([f"<li>{html.escape(b)}</li>" for b in bullets])
     assumptions_html = ""
     if assumptions:
-        safe_assumptions = "; ".join([st._utils.escape_markdown(a) for a in assumptions])
+        safe_assumptions = "; ".join([html.escape(a) for a in assumptions])
         assumptions_html = f'<div class="swot-subtle"><b>Assumptions:</b> {safe_assumptions}</div>'
 
     st.markdown(

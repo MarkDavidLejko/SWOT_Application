@@ -17,26 +17,27 @@ from engine.utils import (
 # ----------------------------
 # LLM client abstraction
 # ----------------------------
-def _call_llm_openai(prompt: str, api_key: str, model: str = "gpt-4o-mini") -> str:
+def _call_llm_gemini(prompt: str, api_key: str, model: str = "gemini-2.5-flash") -> str:
     """
-    OpenAI client call (single request).
-    Code stays abstract: change model/client here without touching UI.
+    Gemini client call (single request). Returns plain text.
     """
     try:
-        from openai import OpenAI  # openai>=1.0.0
+        from google import genai
     except Exception as e:
-        raise RuntimeError("Missing dependency: openai. Install it in your environment.") from e
+        raise RuntimeError("Missing dependency: google-genai. Install it in your environment.") from e
 
-    client = OpenAI(api_key=api_key)
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": "You are a precise strategy consultant. Output strictly valid JSON only."},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.4,
+    client = genai.Client(api_key=api_key)
+
+    full_prompt = (
+        "You are a precise strategy consultant. Output strictly valid JSON only.\n\n"
+        + prompt
     )
-    return (resp.choices[0].message.content or "").strip()
+
+    resp = client.models.generate_content(
+        model=model,
+        contents=full_prompt,
+    )
+    return (resp.text or "").strip()
 
 
 def _detail_to_bullet_count(detail_level: int) -> int:
@@ -275,7 +276,7 @@ def generate_swot(inputs: Dict[str, Any], api_key: str, use_cache: bool = True) 
     prompt, bullet_count, include_assumptions = _build_prompt(inputs)
 
     # Choose API key: sidebar input wins, else env var fallback
-    key = (api_key or "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    key = (api_key or "").strip() or os.getenv("GEMINI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("No API key provided and OPENAI_API_KEY is not set.")
 
@@ -313,7 +314,7 @@ def generate_swot(inputs: Dict[str, Any], api_key: str, use_cache: bool = True) 
                 pass
 
     # 1) LLM call
-    raw = _call_llm_openai(prompt=prompt, api_key=key)
+    raw = _call_llm_gemini(prompt=prompt, api_key=key)
     raw_model_output = raw
 
     # 2) Parse
@@ -342,7 +343,7 @@ def generate_swot(inputs: Dict[str, Any], api_key: str, use_cache: bool = True) 
     except Exception:
         # 3) One repair pass
         repair = _repair_prompt(raw, include_assumptions=include_assumptions)
-        repaired = _call_llm_openai(prompt=repair, api_key=key)
+        repaired = _call_llm_gemini(prompt=repair, api_key=key)
         raw_model_output = raw_model_output + "\n\n---REPAIR_PASS_OUTPUT---\n" + repaired
 
         try:
